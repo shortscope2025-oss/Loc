@@ -26,11 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.MapType
-import com.google.maps.android.compose.rememberCameraPositionState
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.jahid.together.data.model.AppNotification
 import com.jahid.together.data.model.HomeLocation
 import com.jahid.together.data.model.LiveLocation
@@ -40,7 +36,13 @@ import com.jahid.together.ui.theme.*
 import com.jahid.together.ui.viewmodel.AuthViewModel
 import com.jahid.together.ui.viewmodel.LocationViewModel
 import com.jahid.together.ui.viewmodel.PairViewModel
-import kotlinx.coroutines.launch
+
+private data class GeofenceBanner(
+    val bg: Color,
+    val fg: Color,
+    val text: String,
+    val icon: ImageVector
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,133 +62,171 @@ fun MainLiveMapScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    var currentMapType by remember { mutableStateOf(MapType.NORMAL) }
-
-    val defaultPos = remember {
-        when {
-            partnerLocation != null && partnerLocation.isValid() -> LatLng(partnerLocation.latitude, partnerLocation.longitude)
-            myLocation != null && myLocation.isValid() -> LatLng(myLocation.latitude, myLocation.longitude)
-            else -> LatLng(23.8103, 90.4125)
-        }
-    }
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(defaultPos, 15f)
-    }
 
     Box(modifier = modifier.fillMaxSize()) {
-        // Google Maps Compose: Real-time Partner Live Location & Couple Geofence
-        TogetherGoogleMapView(
+        // Zero-cost OpenStreetMap interactive Map
+        TogetherMapView(
             myLocation = myLocation,
             partnerLocation = partnerLocation,
             homeLocation = homeLocation,
             myName = currentUser.displayName,
             partnerName = partnerUser?.displayName ?: "আমার প্রিয়",
-            partnerPhotoBase64 = partnerUser?.photoBase64 ?: "",
-            cameraPositionState = cameraPositionState,
-            mapType = currentMapType
+            partnerPhotoBase64 = partnerUser?.photoBase64 ?: ""
         )
 
-        // Top Header Bar
-        Surface(
+        // Top Column: Partner Header + Live Geofence Alert Banner
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-            shadowElevation = 4.dp
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+            // Partner Profile Bar
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                shadowElevation = 4.dp
             ) {
                 Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { onNavigateToPartnerDetails() }
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    ProfileAvatar(
-                        photoBase64 = partnerUser?.photoBase64 ?: "",
-                        displayName = partnerUser?.displayName ?: "❤️",
-                        size = 46.dp
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = partnerUser?.displayName ?: "সঙ্গী খুঁজছি...",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { onNavigateToPartnerDetails() }
+                    ) {
+                        ProfileAvatar(
+                            photoBase64 = partnerUser?.photoBase64 ?: "",
+                            displayName = partnerUser?.displayName ?: "❤️",
+                            size = 46.dp
                         )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            StatusBadge(
-                                isOnline = partnerLocation?.isOnline ?: false,
-                                isMoving = partnerLocation?.isMoving ?: false
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = partnerUser?.displayName ?: "সঙ্গী খুঁজছি...",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
-                            if (partnerLocation != null) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                BatteryBadge(
-                                    batteryPct = partnerLocation.batteryLevel,
-                                    isCharging = partnerLocation.isCharging
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                StatusBadge(
+                                    isOnline = partnerLocation?.isOnline ?: false,
+                                    isMoving = partnerLocation?.isMoving ?: false
                                 )
+                                if (partnerLocation != null) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    BatteryBadge(
+                                        batteryPct = partnerLocation.batteryLevel,
+                                        isCharging = partnerLocation.isCharging
+                                    )
+                                }
                             }
                         }
                     }
-                }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onNavigateToNotifications) {
-                        BadgedBox(badge = {}) {
-                            Icon(Icons.Default.Notifications, contentDescription = "নোটিফিকেশন", tint = RosePrimary)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = onNavigateToNotifications) {
+                            BadgedBox(badge = {}) {
+                                Icon(Icons.Default.Notifications, contentDescription = "নোটিফিকেশন", tint = RosePrimary)
+                            }
+                        }
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "সেটিংস", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "সেটিংস", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                }
+            }
+
+            // Real-time Geofence Alert Banner
+            Spacer(modifier = Modifier.height(8.dp))
+            val dist = partnerDistanceHome
+            val banner = when {
+                homeLocation == null || !homeLocation.isValid() -> {
+                    GeofenceBanner(
+                        Color(0xFFFEF3C7),
+                        Color(0xFFB45309),
+                        "🏡 বাড়ির অবস্থান সেট করুন — ৫০০ ও ১০০ মিটারের স্বয়ংক্রিয় অ্যালার্ট পেতে",
+                        Icons.Default.Home
+                    )
+                }
+                dist != null && dist <= 100.0 -> {
+                    GeofenceBanner(
+                        Color(0xFFFFE4E6),
+                        Color(0xFFE11D48),
+                        "🚨 গেট খুলে রাখো, আর মাত্র ১০০ মিটার দূরে!",
+                        Icons.Default.NotificationsActive
+                    )
+                }
+                dist != null && dist <= 500.0 -> {
+                    GeofenceBanner(
+                        Color(0xFFECFDF5),
+                        Color(0xFF047857),
+                        "❤️ আপনার কলিজা আসতেছে, গেট খুলে রাখো।",
+                        Icons.Default.Favorite
+                    )
+                }
+                dist != null && dist > 525.0 -> {
+                    GeofenceBanner(
+                        Color(0xFFEFF6FF),
+                        Color(0xFF1D4ED8),
+                        "🚶 আপনার কলিজা চলে গেছে ❤️ গেট লাগিয়ে রাখো।",
+                        Icons.Default.DirectionsWalk
+                    )
+                }
+                else -> {
+                    GeofenceBanner(
+                        Color(0xFFF1F5F9),
+                        Color(0xFF475569),
+                        "✨ লাইভ অবস্থান নজরদারি সক্রিয় রয়েছে",
+                        Icons.Default.LocationOn
+                    )
+                }
+            }
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                color = banner.bg,
+                shadowElevation = 2.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = banner.icon,
+                        contentDescription = null,
+                        tint = banner.fg,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = banner.text,
+                        color = banner.fg,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
 
-        // Floating Action Buttons for quick navigation on Google Maps
+        // Floating Action Buttons for Map Controls
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .padding(end = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Map Type Toggle (Normal / Satellite)
-            SmallFloatingActionButton(
-                onClick = {
-                    currentMapType = if (currentMapType == MapType.NORMAL) MapType.SATELLITE else MapType.NORMAL
-                },
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-            ) {
-                Icon(
-                    imageVector = if (currentMapType == MapType.NORMAL) Icons.Default.Layers else Icons.Default.Map,
-                    contentDescription = "ম্যাপ ধরন পরিবর্তন",
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            // Recenter on Partner
             FloatingActionButton(
                 onClick = {
-                    if (partnerLocation != null && partnerLocation.isValid()) {
-                        coroutineScope.launch {
-                            cameraPositionState.animate(
-                                CameraUpdateFactory.newLatLngZoom(
-                                    LatLng(partnerLocation.latitude, partnerLocation.longitude),
-                                    16.5f
-                                )
-                            )
-                        }
-                        Toast.makeText(context, "সঙ্গীর রিয়েল-টাইম অবস্থান ❤️", Toast.LENGTH_SHORT).show()
+                    if (homeLocation == null || !homeLocation.isValid()) {
+                        onNavigateToHomeSetup()
                     } else {
-                        Toast.makeText(context, "সঙ্গীর অবস্থান অপেক্ষা করছে...", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "বাড়ি অবস্থান ৫00 মি. জিওফেন্স সক্রিয় 🏡", Toast.LENGTH_SHORT).show()
                     }
                 },
                 modifier = Modifier.size(48.dp),
@@ -194,54 +234,16 @@ fun MainLiveMapScreen(
                 contentColor = RosePrimary,
                 shape = CircleShape
             ) {
-                Icon(Icons.Default.Favorite, contentDescription = "সঙ্গীর অবস্থান")
-            }
-
-            // Recenter on Home
-            FloatingActionButton(
-                onClick = {
-                    if (homeLocation == null || !homeLocation.isValid()) {
-                        onNavigateToHomeSetup()
-                    } else {
-                        coroutineScope.launch {
-                            cameraPositionState.animate(
-                                CameraUpdateFactory.newLatLngZoom(
-                                    LatLng(homeLocation.latitude, homeLocation.longitude),
-                                    16f
-                                )
-                            )
-                        }
-                        Toast.makeText(context, "বাড়ি কেন্দ্রে স্থাপন করা হচ্ছে 🏡", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                modifier = Modifier.size(48.dp),
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = Color(0xFFF59E0B),
-                shape = CircleShape
-            ) {
                 Icon(Icons.Default.Home, contentDescription = "বাড়ি কেন্দ্র")
             }
 
-            // Recenter on My Location
             FloatingActionButton(
                 onClick = {
-                    if (myLocation != null && myLocation.isValid()) {
-                        coroutineScope.launch {
-                            cameraPositionState.animate(
-                                CameraUpdateFactory.newLatLngZoom(
-                                    LatLng(myLocation.latitude, myLocation.longitude),
-                                    16.5f
-                                )
-                            )
-                        }
-                        Toast.makeText(context, "আমার অবস্থান কেন্দ্র করা হচ্ছে", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(context, "আমার অবস্থান অপেক্ষা করছে...", Toast.LENGTH_SHORT).show()
-                    }
+                    Toast.makeText(context, "আমার বর্তমান অবস্থান ট্র্যাকিং সক্রিয়", Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.size(48.dp),
                 containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = Color(0xFF2563EB),
+                contentColor = CoralSecondary,
                 shape = CircleShape
             ) {
                 Icon(Icons.Default.MyLocation, contentDescription = "আমার অবস্থান")

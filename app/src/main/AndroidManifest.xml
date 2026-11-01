@@ -25,11 +25,6 @@
         android:theme="@style/Theme.MyApplication"
         android:usesCleartextTraffic="true">
 
-        <!-- Google Maps API Key (injected from .env / Secrets panel via Secrets Gradle Plugin) -->
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="${MAPS_API_KEY}" />
-
         <activity
             android:name=".MainActivity"
             android:exported="true"
