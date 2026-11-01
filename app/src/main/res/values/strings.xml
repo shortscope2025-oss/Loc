@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Together</string>
+    <string name="app_tagline">দুজনের নিরাপদ সঙ্গ</string>
+    <string name="location_service_notification_title">Together অবস্থান ট্র্যাকিং সক্রিয় ❤️</string>
+    <string name="location_service_notification_desc">আপনার সঙ্গীর সাথে রিয়েল-টাইম অবস্থান শেয়ার হচ্ছে</string>
+    <string name="channel_location_name">Together অবস্থান সেবা</string>
+    <string name="channel_location_desc">রিয়েল-টাইম অবস্থান ট্র্যাকিং বিজ্ঞপ্তি</string>
+    <string name="channel_geofence_name">Together গৃহ নিরাপত্তা ও সতর্কবার্তা</string>
+    <string name="channel_geofence_desc">বাসায় আসা এবং যাওয়ার নোটিফিকেশন</string>
+</resources>

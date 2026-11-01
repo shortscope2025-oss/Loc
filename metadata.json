@@ -1,0 +1,6 @@
+{
+  "name": "Together",
+  "description": "দুজনের নিরাপদ সঙ্গ - Couple live location sharing and geofence alerts",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
