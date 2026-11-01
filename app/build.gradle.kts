@@ -114,6 +114,8 @@ dependencies {
   implementation(libs.firebase.messaging)
   implementation(libs.coil.compose)
   implementation(libs.play.services.location)
+  implementation(libs.maps.compose)
+  implementation(libs.play.services.maps)
   implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)

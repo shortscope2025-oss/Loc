@@ -26,6 +26,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.MapType
+import com.google.maps.android.compose.rememberCameraPositionState
 import com.jahid.together.data.model.AppNotification
 import com.jahid.together.data.model.HomeLocation
 import com.jahid.together.data.model.LiveLocation
@@ -35,6 +40,7 @@ import com.jahid.together.ui.theme.*
 import com.jahid.together.ui.viewmodel.AuthViewModel
 import com.jahid.together.ui.viewmodel.LocationViewModel
 import com.jahid.together.ui.viewmodel.PairViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,17 +60,31 @@ fun MainLiveMapScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var isMapControlsExpanded by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    var currentMapType by remember { mutableStateOf(MapType.NORMAL) }
+
+    val defaultPos = remember {
+        when {
+            partnerLocation != null && partnerLocation.isValid() -> LatLng(partnerLocation.latitude, partnerLocation.longitude)
+            myLocation != null && myLocation.isValid() -> LatLng(myLocation.latitude, myLocation.longitude)
+            else -> LatLng(23.8103, 90.4125)
+        }
+    }
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(defaultPos, 15f)
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
-        // Interactive Leaflet OpenStreetMap Map
-        TogetherMapView(
+        // Google Maps Compose: Real-time Partner Live Location & Couple Geofence
+        TogetherGoogleMapView(
             myLocation = myLocation,
             partnerLocation = partnerLocation,
             homeLocation = homeLocation,
             myName = currentUser.displayName,
             partnerName = partnerUser?.displayName ?: "আমার প্রিয়",
-            partnerPhotoBase64 = partnerUser?.photoBase64 ?: ""
+            partnerPhotoBase64 = partnerUser?.photoBase64 ?: "",
+            cameraPositionState = cameraPositionState,
+            mapType = currentMapType
         )
 
         // Top Header Bar
@@ -130,19 +150,43 @@ fun MainLiveMapScreen(
             }
         }
 
-        // Floating Action Buttons for quick navigation on Map
+        // Floating Action Buttons for quick navigation on Google Maps
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .padding(end = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            // Map Type Toggle (Normal / Satellite)
+            SmallFloatingActionButton(
+                onClick = {
+                    currentMapType = if (currentMapType == MapType.NORMAL) MapType.SATELLITE else MapType.NORMAL
+                },
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ) {
+                Icon(
+                    imageVector = if (currentMapType == MapType.NORMAL) Icons.Default.Layers else Icons.Default.Map,
+                    contentDescription = "ম্যাপ ধরন পরিবর্তন",
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Recenter on Partner
             FloatingActionButton(
                 onClick = {
-                    if (homeLocation == null || !homeLocation.isValid()) {
-                        onNavigateToHomeSetup()
+                    if (partnerLocation != null && partnerLocation.isValid()) {
+                        coroutineScope.launch {
+                            cameraPositionState.animate(
+                                CameraUpdateFactory.newLatLngZoom(
+                                    LatLng(partnerLocation.latitude, partnerLocation.longitude),
+                                    16.5f
+                                )
+                            )
+                        }
+                        Toast.makeText(context, "সঙ্গীর রিয়েল-টাইম অবস্থান ❤️", Toast.LENGTH_SHORT).show()
                     } else {
-                        Toast.makeText(context, "বাড়ি কেন্দ্রে স্থাপন করা হচ্ছে 🏡", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "সঙ্গীর অবস্থান অপেক্ষা করছে...", Toast.LENGTH_SHORT).show()
                     }
                 },
                 modifier = Modifier.size(48.dp),
@@ -150,16 +194,54 @@ fun MainLiveMapScreen(
                 contentColor = RosePrimary,
                 shape = CircleShape
             ) {
-                Icon(Icons.Default.Home, contentDescription = "বাড়ি কেন্দ্র")
+                Icon(Icons.Default.Favorite, contentDescription = "সঙ্গীর অবস্থান")
             }
 
+            // Recenter on Home
             FloatingActionButton(
                 onClick = {
-                    Toast.makeText(context, "আমার অবস্থান কেন্দ্র করা হচ্ছে", Toast.LENGTH_SHORT).show()
+                    if (homeLocation == null || !homeLocation.isValid()) {
+                        onNavigateToHomeSetup()
+                    } else {
+                        coroutineScope.launch {
+                            cameraPositionState.animate(
+                                CameraUpdateFactory.newLatLngZoom(
+                                    LatLng(homeLocation.latitude, homeLocation.longitude),
+                                    16f
+                                )
+                            )
+                        }
+                        Toast.makeText(context, "বাড়ি কেন্দ্রে স্থাপন করা হচ্ছে 🏡", Toast.LENGTH_SHORT).show()
+                    }
                 },
                 modifier = Modifier.size(48.dp),
                 containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = CoralSecondary,
+                contentColor = Color(0xFFF59E0B),
+                shape = CircleShape
+            ) {
+                Icon(Icons.Default.Home, contentDescription = "বাড়ি কেন্দ্র")
+            }
+
+            // Recenter on My Location
+            FloatingActionButton(
+                onClick = {
+                    if (myLocation != null && myLocation.isValid()) {
+                        coroutineScope.launch {
+                            cameraPositionState.animate(
+                                CameraUpdateFactory.newLatLngZoom(
+                                    LatLng(myLocation.latitude, myLocation.longitude),
+                                    16.5f
+                                )
+                            )
+                        }
+                        Toast.makeText(context, "আমার অবস্থান কেন্দ্র করা হচ্ছে", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "আমার অবস্থান অপেক্ষা করছে...", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                modifier = Modifier.size(48.dp),
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = Color(0xFF2563EB),
                 shape = CircleShape
             ) {
                 Icon(Icons.Default.MyLocation, contentDescription = "আমার অবস্থান")
